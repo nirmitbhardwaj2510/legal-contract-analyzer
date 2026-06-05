@@ -1,0 +1,8 @@
+cohere
+langchain
+langchain-community
+langchain-cohere
+chromadb
+streamlit
+pymupdf
+python-dotenv
