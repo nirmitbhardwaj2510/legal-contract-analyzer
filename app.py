@@ -182,9 +182,14 @@ if uploaded_file is not None:
 
         st.markdown('<div class="section-label" style="margin-top:40px;">Step 02 — AI Analysis</div>', unsafe_allow_html=True)
 
-        with st.spinner("🔍 Analyzing with Cohere RAG pipeline..."):
-            from analyzer import analyze_contract
-            results = analyze_contract(tmp_path)
+    with st.spinner("🔍 Analyzing with Cohere RAG pipeline..."):
+        import importlib
+        import vector_store
+        import analyzer
+        importlib.reload(vector_store)
+        importlib.reload(analyzer)
+        from analyzer import analyze_contract
+        results = analyze_contract(tmp_path)
 
         high_c = sum(1 for r in results if "RISK LEVEL: HIGH" in r["analysis"])
         med_c  = sum(1 for r in results if "RISK LEVEL: MEDIUM" in r["analysis"])

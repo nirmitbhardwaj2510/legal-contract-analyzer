@@ -6,11 +6,11 @@ from vector_store import search_chunks
 load_dotenv()
 co=cohere.Client(os.getenv("COHERE_API_KEY"))
 RISK_CATEGORIES=[
-    "liability and damanges"
-    "termination condition"
-    "intellectual property ownership"
-    "payment terms and penalties"
-    "non compete and confindential"
+    "liability and damanges",
+    "termination condition",
+    "intellectual property ownership",
+    "payment terms and penalties",
+    "non compete and confindential",
     "indemnification obligations"
 ]
 def analyze_risk(chunks_text):
