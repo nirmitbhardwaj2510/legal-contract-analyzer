@@ -2,6 +2,7 @@ import streamlit as st
 import tempfile
 import os
 import math
+from analyzer import analyze_contract
 
 st.set_page_config(
     page_title="LexAI — Contract Risk Analyzer",
@@ -23,7 +24,6 @@ st.markdown("""
 .stApp { background:var(--bg) !important; font-family:'DM Sans',sans-serif; }
 #MainMenu, footer, header { visibility:hidden; }
 .block-container { padding:0 !important; max-width:100% !important; }
-
 .hero { background:linear-gradient(135deg,#0a0a0f 0%,#111128 50%,#0a0a0f 100%); border-bottom:1px solid var(--border); padding:48px 64px 40px; position:relative; overflow:hidden; }
 .hero::before { content:''; position:absolute; top:-50%; left:-10%; width:500px; height:500px; background:radial-gradient(circle,rgba(124,106,247,0.08) 0%,transparent 70%); pointer-events:none; }
 .badge { display:inline-flex; align-items:center; gap:6px; background:rgba(201,169,110,0.1); border:1px solid rgba(201,169,110,0.3); color:var(--accent); font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:6px 14px; border-radius:2px; margin-bottom:20px; }
@@ -36,8 +36,6 @@ st.markdown("""
 .stat-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
 .main-content { padding:48px 64px; max-width:1200px; margin:0 auto; }
 .section-label { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:24px; padding-bottom:12px; border-bottom:1px solid var(--border); }
-
-/* DASHBOARD */
 .dashboard { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:36px; margin-bottom:40px; }
 .dashboard-title { font-family:'Playfair Display',serif; font-size:22px; color:var(--text); margin-bottom:28px; }
 .dashboard-grid { display:grid; grid-template-columns:200px 1fr 1fr; gap:24px; align-items:center; }
@@ -61,8 +59,6 @@ st.markdown("""
 .bar-fill.high { background:var(--red); }
 .bar-fill.medium { background:var(--yellow); }
 .bar-fill.low { background:var(--green); }
-
-/* RISK CARDS */
 .risk-card { background:var(--card); border-radius:8px; border:1px solid var(--border); padding:28px 32px; margin-bottom:16px; position:relative; overflow:hidden; }
 .risk-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; }
 .risk-card.high::before { background:var(--red); }
@@ -97,6 +93,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 def make_health_gauge(score):
     radius = 60
     cx, cy = 80, 80
@@ -128,6 +125,7 @@ def make_health_gauge(score):
         font-size="9" letter-spacing="2" fill="{stroke}">{label}</text>
     </svg>"""
 
+
 def make_bar(label, count, total, level):
     pct = int((count / total) * 100) if total > 0 else 0
     return f"""
@@ -140,6 +138,7 @@ def make_bar(label, count, total, level):
             <div class="bar-fill {level}" style="width:{pct}%"></div>
         </div>
     </div>"""
+
 
 # ── HERO ──
 st.markdown("""
@@ -159,7 +158,7 @@ st.markdown("""
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 st.markdown('<div class="section-label">Step 01 — Upload Document</div>', unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("", type=["pdf"], label_visibility="collapsed")
+uploaded_file = st.file_uploader("Upload your Contract PDF", type=["pdf"], label_visibility="collapsed")
 
 if uploaded_file is None:
     st.markdown("""
@@ -176,15 +175,22 @@ if uploaded_file is not None:
         analyze_btn = st.button("⚖️ Analyze Contract Risks", type="primary", use_container_width=True)
 
     if analyze_btn:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(uploaded_file.read())
-            tmp_path = tmp.name
+        # Save uploaded file to temp path
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        tmp_file.write(uploaded_file.read())
+        tmp_file.close()
+        tmp_path = tmp_file.name
 
         st.markdown('<div class="section-label" style="margin-top:40px;">Step 02 — AI Analysis</div>', unsafe_allow_html=True)
 
-    with st.spinner("🔍 Analyzing with Cohere RAG pipeline..."):
-        from analyzer import analyze_contract
-        results = analyze_contract(tmp_path)
+        with st.spinner("🔍 Analyzing with Cohere RAG pipeline..."):
+            results = analyze_contract(tmp_path)
+
+        # Cleanup temp file
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
         high_c = sum(1 for r in results if "RISK LEVEL: HIGH" in r["analysis"])
         med_c  = sum(1 for r in results if "RISK LEVEL: MEDIUM" in r["analysis"])
@@ -196,9 +202,9 @@ if uploaded_file is not None:
         st.markdown('<div class="section-label" style="margin-top:40px;">Contract Health Dashboard</div>', unsafe_allow_html=True)
 
         gauge = make_health_gauge(health)
-        bars  = make_bar("High Risk", high_c, total, "high") + \
-                make_bar("Medium Risk", med_c, total, "medium") + \
-                make_bar("Low Risk", low_c, total, "low")
+        bars  = (make_bar("High Risk", high_c, total, "high") +
+                 make_bar("Medium Risk", med_c, total, "medium") +
+                 make_bar("Low Risk", low_c, total, "low"))
 
         st.markdown(f"""
         <div class="dashboard">
@@ -222,7 +228,7 @@ if uploaded_file is not None:
         st.markdown('<div class="section-label">Step 03 — Detailed Risk Report</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="summary-bar">
-            <div class="summary-title">Risk Analysis Complete — {total} Categories Analyzed</div>
+            <div class="summary-title">Analysis Complete — {total} Categories Checked</div>
             <div class="summary-pills">
                 <div class="pill high">🔴 {high_c} High</div>
                 <div class="pill medium">🟡 {med_c} Medium</div>
@@ -265,12 +271,10 @@ if uploaded_file is not None:
                     </div>
                 </div>
                 <div class="clause-box">
-                    <div class="clause-label">📋 Relevant Contract Clause</div>
+                    <div class="clause-label">📋 Relevant Clause</div>
                     {clause_preview}
                 </div>
             </div>""", unsafe_allow_html=True)
-
-        os.unlink(tmp_path)
 
         st.markdown("""
         <div class="powered">
@@ -278,3 +282,6 @@ if uploaded_file is not None:
         </div>""", unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
+
+
