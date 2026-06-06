@@ -183,11 +183,6 @@ if uploaded_file is not None:
         st.markdown('<div class="section-label" style="margin-top:40px;">Step 02 — AI Analysis</div>', unsafe_allow_html=True)
 
     with st.spinner("🔍 Analyzing with Cohere RAG pipeline..."):
-        import importlib
-        import vector_store
-        import analyzer
-        importlib.reload(vector_store)
-        importlib.reload(analyzer)
         from analyzer import analyze_contract
         results = analyze_contract(tmp_path)
 
